@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { STATUS_LABELS } from '../lib/statusLabels'
 import { signInWithGoogle } from '../lib/authActions'
 import PhotoGalleryModal from '../components/PhotoGalleryModal'
+import CheckoutSuccessModal from '../components/CheckoutSuccessModal'
 
 export default function ItemPage() {
   const { id } = useParams()
@@ -15,7 +16,10 @@ export default function ItemPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [actionError, setActionError] = useState(null)
+  const [successMsg, setSuccessMsg] = useState(null)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [galleryIndex, setGalleryIndex] = useState(null)
+  const [heroOpen, setHeroOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -50,15 +54,18 @@ export default function ItemPage() {
 
   const handleCheckout = async () => {
     setActionError(null)
+    const requestedQuantity = Number(quantity) || 1
     const { error } = await supabase.rpc('checkout_quantity', {
       item_id: id,
-      requested_quantity: quantity,
+      requested_quantity: requestedQuantity,
     })
     if (error) {
       setActionError(error.message)
       return
     }
-    setAvailable((prev) => prev - quantity)
+    setAvailable((prev) => prev - requestedQuantity)
+    setSuccessMsg(`You successfully checked out ${requestedQuantity > 1 ? `${requestedQuantity} × ` : ''}${equipment.name}!`)
+    setShowSuccessModal(true)
   }
 
   if (loading) return <p className="status-text">Loading item…</p>
@@ -72,7 +79,9 @@ export default function ItemPage() {
       <Link to="/browse" className="back-button">← Back to all equipment</Link>
       <div className="item-card">
         {equipment.thumbnail_url && (
-          <img src={equipment.thumbnail_url} alt={equipment.name} className="item-hero-photo" />
+          <button type="button" className="item-hero-photo-button" onClick={() => setHeroOpen(true)}>
+            <img src={equipment.thumbnail_url} alt={equipment.name} className="item-hero-photo" />
+          </button>
         )}
 
         <div className="item-card-header">
@@ -131,7 +140,22 @@ export default function ItemPage() {
                     min="1"
                     max={available}
                     value={quantity}
-                    onChange={(e) => setQuantity(Math.max(1, Math.min(available, Number(e.target.value))))}
+                    onChange={(e) => {
+                      const raw = e.target.value
+                      if (raw === '') {
+                        setQuantity('')
+                        return
+                      }
+                      const num = Number(raw)
+                      if (!Number.isNaN(num)) setQuantity(num)
+                    }}
+                    onBlur={() => {
+                      setQuantity((prev) => {
+                        const num = Number(prev)
+                        if (prev === '' || Number.isNaN(num) || num < 1) return 1
+                        return Math.min(available, num)
+                      })
+                    }}
                   />
                 </label>
               )}
@@ -142,6 +166,21 @@ export default function ItemPage() {
           {actionError && <p className="error-text">{actionError}</p>}
         </div>
       </div>
+
+      {showSuccessModal && (
+        <CheckoutSuccessModal
+          message={successMsg}
+          onClose={() => setShowSuccessModal(false)}
+        />
+      )}
+
+      {heroOpen && (
+        <PhotoGalleryModal
+          photos={[equipment.thumbnail_full_url || equipment.thumbnail_url]}
+          startIndex={0}
+          onClose={() => setHeroOpen(false)}
+        />
+      )}
 
       {galleryIndex !== null && (
         <PhotoGalleryModal

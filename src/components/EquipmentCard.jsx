@@ -1,9 +1,12 @@
 import QRCodeCell from './QRCodeCell'
 import { STATUS_LABELS } from '../lib/statusLabels'
+import { getEffectiveStatus } from '../lib/equipmentStatus'
+import { formatDate } from '../lib/formatDate'
 
 export default function EquipmentCard({ item, checkouts, onEdit, onDelete, onReturnCheckout }) {
   const checkedOutQuantity = checkouts.reduce((sum, c) => sum + c.quantity, 0)
   const available = item.total_quantity - checkedOutQuantity
+  const effectiveStatus = getEffectiveStatus(item, checkedOutQuantity)
 
   return (
     <div className="equipment-card">
@@ -13,8 +16,8 @@ export default function EquipmentCard({ item, checkouts, onEdit, onDelete, onRet
 
       <div className="equipment-card-header">
         <h3>{item.name}</h3>
-        <span className={`status-pill status-${item.status}`}>
-          {STATUS_LABELS[item.status] || item.status}
+        <span className={`status-pill status-${effectiveStatus}`}>
+          {STATUS_LABELS[effectiveStatus] || effectiveStatus}
         </span>
       </div>
 
@@ -35,7 +38,7 @@ export default function EquipmentCard({ item, checkouts, onEdit, onDelete, onRet
             <div key={c.id} className="checkout-row">
               <span>
                 {c.borrower?.email || 'Unknown'} — {c.quantity}
-                {' '}(since {new Date(c.checked_out_at).toLocaleDateString()})
+                {' '}(since {formatDate(c.checked_out_at)})
               </span>
               <button onClick={() => onReturnCheckout(c.id)}>Mark Returned</button>
             </div>
